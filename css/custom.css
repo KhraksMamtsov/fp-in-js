@@ -1,0 +1,55 @@
+/*.slide--main {*/
+/*background-size: cover;*/
+/*background: url("../img/fp.png") center no-repeat;*/
+/*}*/
+
+/*.reveal .slides {*/
+/*width: 100% !important;*/
+/*height: 100% !important;*/
+/*}*/
+
+/*.reveal .slides > section, .reveal .slides > section > section {*/
+/*height: 100%;*/
+/*!*position: relative;*!*/
+/*padding: 20px 50px;*/
+/*width: 100%;*/
+/*box-sizing: border-box;*/
+/*!*max-width: 600px;*!*/
+/*!*margin: auto;*!*/
+/*}*/
+.reveal {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+    text-align: left;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 600;
+}
+
+.reveal h1 span {
+    padding: 0 30px;
+}
+
+.reveal h2 span {
+    padding: 0 15px;
+}
+
+.reveal pre code {
+    max-height: none;
+    font-family: "Fira Code", monospace;
+}
+
+.reveal pre {
+    font-size: .45em;
+}
+
+.custom-code-change {
+    background: rgba(3, 255, 33, .1);
+}

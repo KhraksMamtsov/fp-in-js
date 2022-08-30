@@ -1,0 +1,2182 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>FP -> JS</title>
+
+    <link rel="stylesheet" href="https://cdn.rawgit.com/tonsky/FiraCode/1.205/distr/fira_code.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,900&amp;subset=cyrillic-ext" rel="stylesheet">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/black.css">
+    <link rel="stylesheet" href="css/custom.css">
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = window.location.search.match(/print-pdf/gi) ? 'css/print/pdf.css' : 'css/print/paper.css';
+        document.getElementsByTagName('head')[0].appendChild(link);
+    </script>
+</head>
+<body>
+<div class="reveal">
+    <div class="slides">
+        <!--<editor-fold desc="INTRO">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/fp.png" data-background-transition="zoom">
+                <h1 style="color:#132126;">
+                    <span style="background: #5e6b72; font-family: 'Fira Code';">JS ==> FP</span>
+                </h1>
+            </section>
+
+            <section data-background="#5e6b72">
+                <h2 style="color:#132126;">Недалекое настоящее</h2>
+
+                <ul style="color:#132126;">
+                    <li class="fragment" data-fragment-index="1">DOMа больше нет</li>
+                    <li class="fragment" data-fragment-index="2">React не оптимизирует рендеринг</li>
+                    <li class="fragment" data-fragment-index="3">Данные мутируют</li>
+                </ul>
+
+                <aside class="notes" data-markdown>
+                    Современные фреймворки берут на себя взаимодействие с DOM,
+                    оставляя нам только самую вкучную част оперирования данными во благо бизнесс логики,
+                    поэтому полезно будет знать подходы к продуктивной манипуляции данными и иметь навыки их применения
+
+                    Знаменитая библиотека lodash дает нам замечательные утилиты, но они меркнут при виде техник и
+                    принципов, которые пропагандирует функциональный подход.
+
+                    Зная по опыту, что полнофункциональный подход не применим в нашем стеке разработки (directly DOM
+                    manipulation, Vue, React)
+                    я постараюсь сконцентрироваться на тех областях, где внедрение ФП имеет место быть (Data
+                    manipulation,
+                    Vuex, Redux)
+                </aside>
+            </section>
+
+            <section data-background="#5e6b72">
+                <h2 style="color:#132126;">#1</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                ["qwe", "asd", "zxc"].map((word) => word
+                    .toUpperCase()
+                    .split("")
+                    .slice(0, 2)
+                    .join("|")
+                ); // ["Q|W", "A|S", "Z|X"]
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Решаем проблему в лоб.
+
+                    Позже понимаем, что хотим переиспользовать эту функциональность c другими данными.
+
+                    Давайте разделим данные и функции. И используем lodash.
+                </aside>
+            </section>
+
+            <section data-background="#5e6b72">
+                <h2 style="color:#132126;">#2</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                function takeUpperFirstTwoCharacters(words) {
+                    return _.map(words, word => {
+                        return _.take(_.toUpper(word), 2).join("|")
+                    });
+                }
+
+                takeUpperFirstTwoCharacters(["qwe","asd","zxc"]);
+                // ["Q|W", "A|S", "Z|X"]
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Давайте вынесем используемые функции в нашу клиентскую библиотеку утилит,
+                    при этом меняя местами порядок аргументов функций так, чтобы данные передавались в конце.
+                </aside>
+            </section>
+
+            <section data-background="#5e6b72">
+                <h2 style="color:#132126;">#3</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                const LIBRARY = {
+                    take: (n, data) => _.take(data, n),
+                    map: (fn, data) => _.map(data, fn),
+                    join: (separator, data) => data.join(separator)
+                };
+
+                function takeUpperFirstTwoCharacters(words) {
+                    return LIBRARY.map(word => {
+                        return LIBRARY.join("|",
+                            LIBRARY.take(
+                                _.toUpper(word)
+                            , 2)
+                        );
+                    }, words);
+                }
+
+                takeUpperFirstTwoCharacters(["qwe","asd","zxc"]);
+            </code></pre>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="CURRY">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/curry.jpg" data-background-transition="zoom">
+                <h2 style="color:#b0b2af;"><span style="background: #cd4f04;">Currying</span></h2>
+            </section>
+
+            <section data-background="#cd4f04">
+                <h2 style="color:#b0b2af;">Currying</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                    const curryN = (left, fn) =>
+                        left <= 0
+                            ? fn()
+                            : (...args) =>
+                                curryN(left - args.length, fn.bind(undefined, ...args));
+
+                    const curry = fn => curryN(fn.length, fn);
+
+                    const maxOf = (...x) => Math.max(...x);
+                    let maxOfPair = curryN(2, maxOf);
+
+                    console.log(maxOfPair(1, 2)); // 2
+
+                    let sum = curry((a, b, c) => a + b + c);
+
+                    console.log(sum(1, 2, 3)); // [1, 2, 3]
+                    console.log(sum(1)(2, 3)); // [1, 2, 3]
+                    console.log(sum(1, 2)(3)); // [1, 2, 3]
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Идея очень проста: вы можете вызвать функцию с меньшим количеством аргументов, чем она принимает,
+                    в ответ вы получите функцию, которая принимает оставшиеся аргументы.
+
+                    Обычно это сопровождается переименованием функций в более понятный вид.
+
+                    Получается начальными аргументами мы заряжаем, настраиваем функцию на определенный режим работы,
+                    а передав последний аргумент мы запускаем ее исполнение.
+                </aside>
+            </section>
+
+            <section data-background="#cd4f04">
+                <h2 style="color:#b0b2af;">Currying with placeholder</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                    let abc = _.curry((a, b, c) => [a, b, c]);
+
+                    abc(1, 2, 3);             // [1, 2, 3]
+                    abc(R.__, 2, 3)(1);       // [1, 2, 3]
+                    abc(R.__, R.__, 3)(1)(2); // [1, 2, 3]
+                    abc(R.__, R.__, 3)(1, 2); // [1, 2, 3]
+                    abc(R.__, 2, R.__)(1, 3); // [1, 2, 3]
+                    abc(R.__, 2)(1)(3);       // [1, 2, 3]
+                    abc(R.__, 2)(1, 3);       // [1, 2, 3]
+                    abc(R.__, 2)(R.__, 3)(1); // [1, 2, 3]
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Специальное значение-заполнитель, используемое для указания «пробелов» в каррированных функциях,
+                    позволяет частично применять любую комбинацию аргументов независимо от их позиций.
+                </aside>
+            </section>
+
+            <section data-background="#cd4f04">
+                <h2 style="color:#b0b2af;">#4</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                const LIBRARY = {
+                    take: _.curry((n, data) => _.take(data, n)),
+                    map: _.curry((fn, data) => _.map(data, fn)),
+                    join: _.curry((separator, data) => data.join(separator)),
+                    tap: _.curry((fn, data) => fn(data) || data)
+                };
+
+                const joinPipe = LIBRARY.join("|");
+                const take2 = LIBRARY.take(2);
+
+                function takeUpperFirstTwoCharacters(words) {
+                    return LIBRARY.map(word => {
+                        return joinPipe(take2(_.toUpper(words))));
+                    }, words);
+                }
+
+                takeUpperFirstTwoCharacters(["qwe","asd","zxc"]);
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Последний return выглядит перегруженно и плохо читается (инверсия в том числе), но в контексте
+                    данные-действие
+                    видно закономерность: происходит манипуляция и ее результат передается к следующему манипулятору
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="COMPOSITION">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/compose.jpg" data-background-position="71% center"
+                     data-background-transition="zoom">
+                <h2><span style="background: #222222;">Композиция&nbsp;<br/>&nbsp;функций</span></h2>
+            </section>
+
+            <section>
+                <h2>Композиция<br/>функций</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                const pass = fn => data => fn(data) || data;
+                const conveyor = (...fns) =>
+                    data => fns.reduce(
+                        (lastResult, currentFn) => currentFn(lastResult),
+                        data
+                );
+
+                conveyor(
+                  pass(console.log), // 3
+                  (x) => x + 1,
+                  pass(console.log), //4
+                )(3); // 4
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Так давайте сами реализуем функцию композиции!
+
+                    Просто редьюсимся по массиву функций, запоминаем результат в аккумулятор!
+                </aside>
+            </section>
+
+            <section>
+                <h2>#5</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                const LIBRARY = {
+                    take: _.curry((n, data) => _.take(data, n)),
+                    map: _.curry((fn, data) => _.map(data, fn)),
+                    join: _.curry((separator, data) => data.join(separator)),
+                    tap: _.curry((fn, data) => fn(data) || data)
+                };
+
+                const joinPipe = LIBRARY.join("|");
+                const take2 = LIBRARY.take(2);
+
+                let takeUpperFirstTwoCharacters = LIBRARY.map(_.flow([
+                    _.toUpper,
+                    take2,
+                    joinPipe
+                ]));
+
+                takeUpperFirstTwoCharacters(["qwe","asd","zxc"]);
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Теперь стало понятно зачем данные необходимо передавать в последнем аргументе - это все для того,
+                    чтобы
+                    легко было составлять из функций композиции!
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="PURE FUNCTIONS">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/pure.jpg" data-background-transition="zoom">
+                <h2 style="color:#029994"><span style="background: #d2d2d3;">Pure functions</span></h2>
+            </section>
+
+            <section data-background="#d2d2d3">
+                <h2 style="color:#029994">Pure functions</h2>
+                <ul style="color:#029994">
+                    <li class="fragment" data-fragment-index="1">Во время выполнения функции не возникают ВИДИМЫЕ
+                        побочные
+                        эффекты.
+                    </li>
+                    <li class="fragment" data-fragment-index="2">Функция, вызываемая от одних и тех же аргументов,
+                        всегда
+                        возвращает одинаковое значение.
+                    </li>
+                </ul>
+                <pre class="fragment" data-fragment-index="3"><code class="javascript" data-trim data-noescape>
+                    let count = 0;
+                    const factorial = R.memoizeWith(R.identity, n => {
+                      count += 1;
+                      return R.product(R.range(1, n + 1));
+                    });
+                    factorial(5); //=> 120
+                    factorial(5); //=> 120
+                    factorial(5); //=> 120
+                    count; //=> 1
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Мы оторвали работу с данными от данных - значит функции можно переиспользовать
+
+                    Для эффективного переиспользования функций давайте соблюдать кое-какие правила
+                    + Функции по-математически - отображает элемент одного множества на элемент другого
+
+                    Постойте функция зависит только от аргументов - можно использовать паттерн!
+
+                    + ```memoizeWith``` - первый аргумент - это функция генерации ключей
+                    + Переносимость / Самодокументированность
+                    + Тестирумость
+                    + Разумность
+                    + Параллелизм - нет доступа к конкурентным ресурсам
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="SIDE EFFECTS">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/side.jpg" data-background-position="center 82%"
+                     data-background-transition="zoom">
+                <h2 style="color: #453327;"><span style="background: #d9d0b1;">Side effects</span></h2>
+
+                <aside class="notes" data-markdown>
+                    Аттрактор Лоренца
+                    http://www.chaos-math.org/ru/chaos-vii
+                    Пусть наши функции делают только то на что рассчитаны, это избавит нас от напредсказуемых действий
+                    изменениями в файловой системе
+                    вставкой записи в базу данных
+                    выполнение http-запроса
+                    мутациями
+                    выводом на экран / записью в лог
+                    получением данных от пользователя
+                    выполнение запроса к DOM
+                    получением доступа к состоянию системы
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="SUMMARY INTRO">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/wired_arrival_logogram.jpg" data-background-transition="zoom">
+                <h2 style="color: #bebebe;">
+                    <span style="background: #363636;">Итого</span>
+                </h2>
+            </section>
+            <section data-background-color="./img/wired_arrival_logogram.jpg" data-background-transition="zoom">
+                <h2 style="color: #bebebe;">
+                    <span style="background: #363636;">Итого</span>
+                </h2>
+                <ul>
+                    <li class="fragment" data-fragment-index="1">Лексическое замыкание</li>
+                    <li class="fragment" data-fragment-index="2">Функции первого класса и функции высшего порядка</li>
+                    <li class="fragment" data-fragment-index="3">Каррирование</li>
+                    <li class="fragment" data-fragment-index="4">Function first - data last function API</li>
+                    <li class="fragment" data-fragment-index="5">Композиция</li>
+                    <li class="fragment" data-fragment-index="6">Чистые функции</li>
+                    <li class="fragment" data-fragment-index="7">No side effects</li>
+                    <li class="fragment">
+                        <span data-fragment-index="8">State less</span>
+                        <span data-fragment-index="9">Immutability</span>
+                        <span data-fragment-index="10">Ленивость</span>
+                    </li>
+                </ul>
+                <aside class="notes" data-markdown>
+                    Замыкание - возможность js, на полную задействуем при каррировании при настройке функции
+
+                    То что мы можем манипулировать функцией как обычным объектом дает нам возможность использовать
+                    композиции
+                    ведь мы передаем функции в другую функцию высшего порядка
+
+                    Соглашение конструирования API также дает преимущество
+
+                    Чистота функции, и все остальное -
+                    правильность работы,
+                    легкость в покрытии тестами,
+                    очевидность, самодокументируемость, кэшируемость
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="RAMDA">-->
+        <section data-background-transition="zoom">
+
+            <section data-background="./img/arhar.jpg" data-background-transition="zoom">
+                <h2 style="color: #61371a;"><span style="background: #7a9e67;">Ramda</span></h2>
+            </section>
+
+            <section data-background="#7a9e67">
+                <h2 style="color: #61371a;">Ramda</h2>
+                <ul style="color: #61371a;">
+                    <li class="fragment" data-fragment-index="1">Immutability and side-effect free functions are at the
+                        heart of its design philosophy
+                    </li>
+                    <li class="fragment" data-fragment-index="2">Ramda functions are automatically curried</li>
+                    <li class="fragment" data-fragment-index="3">The data to be operated on is generally supplied
+                        last.
+                    </li>
+                </ul>
+
+                <aside class="notes" data-markdown>
+                    Функции без сайд эффектов и иммутабельность
+
+                    По умолчанию автокаррируемые функции
+
+                    Function first - data lat API
+                </aside>
+            </section>
+
+            <section data-background="#7a9e67">
+                <h2 style="color: #61371a;">#6</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                    let takeUpperFirstTwoCharacters = map(pipe(
+                        toUpper,
+                        take(2),
+                        join("|")
+                    ));
+                </code></pre>
+            </section>
+
+            <section data-background="#7a9e67">
+                <h2 style="color: #61371a;">Fibonacci</h2>
+                <style>
+                    .grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, 50%);
+                    }
+
+                    .grid--3-4 {
+                        grid-template-columns: 25% 75%;
+                    }
+
+                    .grid--1-3 {
+                        grid-template-columns: repeat(3, 33.33333%);
+                    }
+
+                    .grid code {
+                        height: 100%;
+                    }
+                </style>
+                <div class="grid">
+                <pre><code class="javascript" data-trim data-noescape>
+                    // Ramda.js cond
+                    // F(<1) = 0;
+                    // F(1) = 1;
+                    // F(n) = F(n-1) + F(n-2);
+
+                    const fib = n => call(cond([
+                      [lte(__, 0), always(0)], // if
+                      [equals(1), always(1)],  // else if
+                      [T, converge(add, [      // else
+                        pipe(dec, fib),
+                        pipe(subtract(__, 2), fib)
+                      ])]
+                    ]), n);
+
+                    fib(7);
+                </code></pre>
+                    <pre><code class="fsharp" data-trim data-noescape>
+                    // F# pattern matching
+                    // F(<1) = 0;
+                    // F(1) = 1;
+                    // F(n) = F(n-1) + F(n-2);
+
+                    let rec fib n =
+                        match n with
+                        | 0 -> 0
+                        | 1 -> 1
+                        | _ -> fib (n - 1) + fib (n - 2)
+
+                    printfn "Fibonacci %d: %d" 7 (fib 7)
+            </code></pre>
+                </div>
+
+                <aside class="notes" data-markdown>
+                    ```Cond``` - else if логика
+
+                    ```lte``` - x меньше или равно y
+
+                    ```always``` - всегда возвращать операнд
+
+                    ```T``` - всегда возвращать true
+
+                    ```dec``` - декремент
+
+                    ```subtract``` - вычесть из x y
+
+                    ```call``` - аналог .call
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="OPTICS">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/optics.jpg" data-background-transition="zoom">
+                <h2 style="color: #e75c19;"><span style="background: #28398b;">Optics</span></h2>
+            </section>
+            <!--<editor-fold desc="ISO">-->
+            <section
+                    data-background="./img/ISO.jpg"
+                    data-background-position="35% center"
+                    data-background-transition="zoom"
+            >
+                <h2 style="color: #f6d7b3;"><span style="background: #60551d;">ISO</span></h2>
+            </section>
+            <section
+                    data-background-color="#60551d"
+                    data-background-transition="zoom"
+            >
+                <h2 style="color: #f6d7b3;"><span style="background: #60551d;">ISO</span></h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    class Iso&lt;From, To&gt; {
+                        constructor(
+                            readonly get       : (from: From) => To,
+                            readonly reverseGet: (to: To) => From,
+                        ) { }
+
+                        reverse(): Iso&lt;To, From&gt; {
+                            return new Iso(this.reverseGet, this.get);
+                        }
+
+                        modify(xfn: (to: To) => To): (from: From) => From {
+                            return from => this.reverseGet(xfn(this.get(from)));
+                        }
+
+                        compose(iso: Iso&lt;To, Next&gt;): Iso&lt;From, Next&gt; {
+                            return new Iso(
+                                (from: From) => iso.get(this.get(from)),
+                                (next: Next) => this.reverseGet(iso.reverseGet(next)),
+                            );
+                        }
+                    }
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    IOS - инвертируемая оптика без потерь, определяющая изоморфизм между двумя классами.
+                    Предствляет из себя пару функций-преобразователей классов.
+
+                    Что же мы можем сделать с этой оптикой?
+                    Реверсить - получим обратный изоморфизм,
+                    Модифицировать - получаем, трансформаируем, возвращаем,
+                    Композировать, для получения нового изоморфизма.
+                </aside>
+            </section>
+            <section
+                    data-background-color="#60551d"
+                    data-background-transition="zoom"
+            >
+                <pre><code class="javascript" data-trim data-noescape>
+                    class M  { constructor(public readonly  _m: number) {} }
+                    class Y  { constructor(public readonly  _y: number) {}
+                               inc() { return new Y(this._y + 1); } }
+                    class KM { constructor(public readonly _km: number) {}}
+
+                    const m_km = new Iso&lt;M, KM&gt;(
+                        m  => new KM(m._m / 1000),  // get
+                        km => new M(km._km * 1000), // reverseGet
+                    )
+
+                    const m_y = new Iso&lt;M, Y&gt;(
+                        m => new Y(m._m * 1.09361),  // get
+                        y => new M(y._y / 1.09361),  // reverseGet
+                    )
+
+                    const km_y = m_km.reverse()/* km_m */.compose(m_y);
+
+                    const meters = new M(1234);
+                    const kMeters = m_km.get(meters);      // M -> KM      = 1.234 km
+                    console.log(m_km.reverseGet(kMeters)); // M -> KM -> M = 1234 m
+                    // KM -> Y -(xfn)-> Y -> KM = 1.234914402757839 km
+                    console.log(km_y.modify(y => y.inc())(kMeters));
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Композируя известные изоморфизы, мы получаем новый изоморфизм, для которого доступны те же свойства
+                    и законы.
+                </aside>
+            </section>
+            <section
+                    data-background-color="#60551d"
+                    data-background-transition="zoom"
+            >
+                <h2 style="color: #f6d7b3;"><span style="background: #60551d;">ISO</span></h2>
+                <div class="grid grid--1-3">
+                    <img src="img/optics/iso/iso-reverse.png"/>
+                    <img src="img/optics/iso/modify.png"/>
+                    <img src="img/optics/iso/compose.png"/>
+                </div>
+            </section>
+            <!--</editor-fold>-->
+
+            <!--<editor-fold desc="PRISM">-->
+            <section data-background="./img/prism.jpg" data-background-transition="zoom">
+                <h2 style="color: #a0def9;"><span style="background: #18318b;">Prism</span></h2>
+            </section>
+            <section data-background-color="#18318b" data-background-transition="zoom">
+                <pre><code class="typescript" data-trim data-noescape>
+                    class Prism&lt;From, To&gt; {
+                        constructor(
+                            readonly getMaybe  : (from: From) => Maybe&lt;To&gt;,
+                            readonly reverseGet: (to: To) => From,
+                        ) { }
+                        set(to: To): (from: From) => From {
+                            return this.modify(_ => to); // K(x) === x => _ => x
+                        }
+                        isMatching(from: From): boolean {
+                            return this.getMaybe(from).isJust;
+                        }
+                        modify(xfn: (to: To) => To): (from: From) => From {
+                            return from => this.modifyMaybe(xfn)(from)
+                                               .getOrElse(from);
+                        }
+                        modifyMaybe(xfn: (to: To) => To): (from: From) => Maybe&lt;From&gt; {
+                            return from => this.getMaybe(from)
+                                               .map(to => this.reverseGet(xfn(to)));
+                        }
+                        compose(prism: Prism&lt;To, Next&gt;): Prism&lt;From, Next&gt; {
+                            return new Prism( //      Maybe&lt;To> -> Maybe&lt;Next&gt;
+                                (from: From) => this.getMaybe(from)
+                                                    .chain(to => prism.getMaybe(to)),
+                                (next: Next) => this.reverseGet(prism.reverseGet(next)),
+                            );
+                        }
+                    }
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Призма - инвертируемая оптика без потерь, определяющая изоморфизм между двумя классами.
+                    Но с учетом того, что первое множество не всегда отображается на второе - с этой целью используется
+                    Maybe.
+                    Заметим, что призма совмещает в себе паттерн матчинг и конструктор.
+                    Что интересно композируется во вложенный паттерн матчинг.
+                </aside>
+            </section>
+            <!--</editor-fold>-->
+
+            <!--<editor-fold desc="LENS">-->
+            <section data-background="./img/binocle.jpg" data-background-transition="zoom">
+                <h2 style="color: #5c346f;"><span style="background: #c3b7a1;">Lenses</span></h2>
+            </section>
+
+            <section data-background="#c3b7a1">
+                <h2 style="color: #5c346f;">Lenses</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    export class Lens&lt;From, To&gt; {
+                        constructor(
+                            readonly get: (from: From) => To,
+                            readonly set: (to: To) => (from: From) => From
+                        ) {}
+
+                        modify(xfn: (to: To) => To): (from: From) => From {
+                            return from => this.set(xfn(this.get(from)))(from);
+                        }
+
+                        compose&lt;Next&gt;(lens: Lens&lt;To, Next&gt;): Lens&lt;From, Next&gt; {
+                            return new Lens(
+                                from => lens.get(this.get(from)),
+                                next => from => this.set(
+                                        lens.set(next)(this.get(from))
+                                )(from)
+                            );
+                        }
+                    }
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Линза - проперти оторванная от объекта.
+                    По сути это объект с методами гет и сет,
+                    в которых инкапсулированна работа с конкретной структурой данных
+                </aside>
+            </section>
+
+            <section data-background="#c3b7a1">
+                <h2 style="color: #5c346f;">Lenses</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    const very = {
+                        deep : { nested: { property: { a:
+                            [1, 2, 3, "change me pls", 4, 5]
+                        } } },
+                        heads: { nested: 2 }
+                    };
+
+                    let xLens = R.lens(
+                        R.path(["deep", "nested", "property", "a", 3]),
+                        R.assocPath(["deep", "nested", "property", "a", 3])
+                    );
+
+                    xLens = R.compose(
+                        R.lensPath(["deep", "nested", "property"]),
+                        R.lensPath(["a", 3])
+                    );
+
+                    R.view(xLens, very); // => "change me pls"
+                    R.set(xLens, "horay", very);
+                    R.over(xLens, R.toUpper, very);
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Композиция линз позволяет создать телескоп для иммутабельных crud операций на глубоко вложенных
+                    структурах.
+                </aside>
+            </section>
+
+            <section data-background="#c3b7a1">
+                <h2 style="color: #5c346f;">Lenses</h2>
+                <style>
+                    .canv {
+                        position: relative;
+                    }
+
+                    .canv img {
+                        position: absolute;
+                        left: 0;
+                        right: 0;
+                        top: 0;
+                        bottom: 0;
+                    }
+                </style>
+                <div class="grid">
+                    <div class="canv">
+                        <img class="fragment" data-fragment-index="1" src="./img/structural%20sharing/1.jpg" alt="">
+                        <img class="fragment" data-fragment-index="2" src="./img/structural%20sharing/2.jpg" alt="">
+                        <img class="fragment" data-fragment-index="3" src="./img/structural%20sharing/3.jpg" alt="">
+                        <img class="fragment" data-fragment-index="4" src="./img/structural%20sharing/4.jpg" alt="">
+                        <img class="fragment" data-fragment-index="5" src="./img/structural%20sharing/5.jpg" alt="">
+                    </div>
+
+                    <pre><code class="javascript" data-trim data-noescape>
+                        const xLens =
+                            R.lensPath(['c1', 'b1', 'a']);
+                        const a = { a: "a" };
+                        const b = { b1: a, b2: a };
+                        const c = { c1: b, c2: b };
+
+                        const cNew = R.set(xLens, 1, c);
+
+                        cNew       === c;    // false
+
+                        cNew.c1    === b;    // false
+                        cNew.c1.b1 === b.b1; // false
+                        cNew.c1.b2 === b.b2; // true
+
+                        cNew.c2    === b;    // true
+                        cNew.c2.b1 === b.b1; // true
+                        cNew.c2.b2 === b.b2; // true
+                    </code></pre>
+                </div>
+
+                <aside class="notes" data-markdown>
+                    Линза - иммутабельна и эта иммутабельность оптимизированна за счет подхода Structural Sharing
+                </aside>
+            </section>
+            <!--</editor-fold>-->
+
+            <!--<editor-fold desc="OPTIONAL">-->
+            <section data-background="./img/telescope.jpg" data-background-transition="zoom">
+                <h2 style="color: #ed8f01;"><span style="background: #427596;">Optional</span></h2>
+            </section>
+            <section data-background-color="#427596" data-background-transition="zoom">
+                <h2 style="color: #ed8f01;">Optional</h2>
+                <pre><code class="typescript" data-trim data-noescape>
+                    class Optional&lt;From, To&gt; {
+                        constructor(
+                            readonly getMaybe  : (from: From) => Maybe&lt;To&gt;,
+                            readonly set       : (to  : To)   => (from: From) => From
+                        ) { }
+                        modify(xfn: (to: To) => To): (from: From) => From {
+                            return from => this.modifyMaybe(xfn)(from)
+                                               .getOrElse(from);
+                        }
+                        modifyMaybe(xfn: (to: To) => To): (from: From) => Maybe&lt;From&gt; {
+                            return from => this.getMaybe(from).map(
+                                   to   => this.set(xfn(to))(from)
+                            );
+                        }
+                        compose(optional: Optional&lt;To, Next&gt;): Optional&lt;From, Next&gt; {
+                            return new Optional( //      Maybe&lt;To> -> Maybe&lt;Next&gt;
+                                from => this.getMaybe(from)
+                                            .chain(to => optional.getMaybe(to)),
+                                next => from => this.set(
+                                        optional.set(next)(this.get(from))
+                                )(from)
+                            );
+                        }
+                    }
+                </code></pre>
+                <aside class="notes">
+                    Optional объединяет в себе логику Prism по расслабленному изоморфизму и линзы по фокусу на проперти.
+                    Композиция возвращает расслабленный телескоп)))
+                </aside>
+            </section>
+            <!--</editor-fold>-->
+            <!--<editor-fold desc="OPTICS HIERARCHY">-->
+            <section data-background="./img/optics_hierarchy.jpg" data-background-transition="zoom">
+                <h2 style="color: #2180ab;"><span style="background: #48302f;">Optics&nbsp;<br/>&nbsp;hierarchy</span>
+                </h2>
+            </section>
+            <section data-background-color="#48302f" data-background-transition="zoom">
+                <h2 style="color: #2180ab;">Optics hierarchy</h2>
+                <div class="grid">
+                    <img src="img/optics_tree.png"/>
+                </div>
+                <aside class="notes">
+                    Рассмотрели только 4 оптики из представленных в библиотеке Monocle.
+                    По остальным можно сказать:
+                    Traversal - оптика-обобщение Optional для нескольких фокусов например в контейнере (List Array ...)
+                    Fold - оптика с определенной операцией свертки (filter, find, ...)
+                    Getter - просто getter
+                    Setter - просто setter
+                    At - линза для определенного индекса в контейнере
+                    Index - расслабленный фокус на определенном индексе в контейнере
+                </aside>
+            </section>
+            <section data-background-color="#48302f" data-background-transition="zoom">
+                <h2 style="color: #2180ab;">Optics composition</h2>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>&nbsp;</th>
+                        <th style="text-align: center">Optional</th>
+                        <th style="text-align: center">Prism</th>
+                        <th style="text-align: center">Lens</th>
+                        <th style="text-align: center">Iso</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><strong>Optional</strong></td>
+                        <td style="text-align: center"><strong>Optional</strong></td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center">Optional</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Prism</strong></td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center"><strong>Prism</strong></td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center">Prism</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Lens</strong></td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center"><strong>Lens</strong></td>
+                        <td style="text-align: center">Lens</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Iso</strong></td>
+                        <td style="text-align: center">Optional</td>
+                        <td style="text-align: center">Prism</td>
+                        <td style="text-align: center">Lens</td>
+                        <td style="text-align: center"><strong>Iso</strong></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <aside class="notes">
+                    Из таблицы видно, что Optional - самый слабый тип оптики из всех рассмотренных, а Iso - самый
+                    сильный, потомучто может быть приведен к любой другой оптике
+                </aside>
+            </section>
+            <section data-background="./img/optics_final.jpg"
+                     data-background-transition="zoom">
+                <h2 style="color: #f1eeee;">
+                    <span style="background: #015867;">Summary</span>
+                </h2>
+                <ul>
+                    <li class="fragment" data-fragment-index="1">Immutability</li>
+                    <li class="fragment" data-fragment-index="2">Structural sharing</li>
+                    <li class="fragment" data-fragment-index="3">Composability</li>
+                </ul>
+
+
+                <aside class="notes">
+                    Функциональная оптика - мощный инструмент, для работы с данными.
+                    Этот подход позволяет декларативно и иммутабельно изменять вложенные структуры данных с помощью
+                    продуманной системы классов и композируемости.
+                </aside>
+            </section>
+            <!--</editor-fold>-->
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="TRANSDUCERS">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/wormhole.jpg" data-background-transition="zoom">
+                <h2 style="color: #512157;"><span style="background: #e6bb8e;">Transducers</span></h2>
+            </section>
+
+            <section data-background="#e6bb8e">
+                <h2 style="color: #512157;">
+                    <span style="background: #e6bb8e;">Проблемы наивной трансформации</span>
+                </h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    .filter(x => x > 5) // [6, 7, 8, 9, 10]
+                    .map(x => x + 1) // [7, 8, 9, 10, 11]
+                    .find((i => { let count = 0;
+
+                        return x => (x % 2 === 0) && (++count === i);
+
+                    })(2)); // 10
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Каждая итерация занимает время, и промежуточный результат записывается в память.
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+            <pre><code class="javascript" data-trim data-noescape>
+                const map = xfn => (acc, cur) => {
+                    acc.push(xfn(cur));
+                    return acc;
+                };
+
+                const filter = predicate => (acc, cur) => {
+                    predicate(cur)) {
+                        acc.push(cur);
+                    }
+                    return acc;
+                };
+
+                const countedFind = (count, predicate) => {
+                    let i = 0;
+                        return (acc, cur) => {
+                        if (predicate(cur) && ++i === count) {
+                            acc.push(cur);
+                        }
+                        return acc;
+                    };
+                };
+
+                [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    .reduce(filter(x => x > 5), []) // [6, 7, 8, 9, 10]
+                    .reduce(map(x => x + 1), [])    // [7, 8, 9, 10, 11]
+                    .reduce(countedFind(2, x => x % 2 === 0), []); // [10]
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Функция редюсер (свертки) - это функция, которая принимает в себя два значения - аккумулятор и
+                    текущее
+                    значение и возвращает новое значение аккумулятора.
+
+                    Заметим что map filter и countedFind возвращают редюсер - умный редюсер, который понимает когда
+                    нужно изменять аккумулятор
+
+                    Но можно выделить еще один редюсер, ктоторый тупой и знает только КАК мутировать аккумулятор
+
+                    Давайте выделим его в отдельный аргумент - применить FP DI
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+            <pre><code class="javascript" data-trim data-noescape>
+                const map = xfn => reducer =>
+                    (acc, cur) => reducer(acc, xfn(cur));
+
+                const filter = predicate => reducer =>
+                    (acc, cur) => predicate(cur) ? reducer(acc, cur) : acc;
+
+                const countedFilter = (count, predicate) => reducer => {
+                    let i = 0;
+                    return (acc, cur) => filter(() => predicate(cur) && ++i === count)
+                           (reducer)(acc, cur)
+                };
+
+                const arrayReducer = (arrayAcc, cur) => arrayAcc.push(cur) && arrayAcc;
+
+                [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    .reduce(filter(x => x > 5)(arrayReducer), []) // [6, 7, 8, 9, 10]
+                    .reduce(map(x => x + 1)(arrayReducer), [])    // [7, 8, 9, 10, 11]
+                    .reduce(countedFilter(2, x => x % 2 === 0)(arrayReducer), []); // [10]
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Функция редюсер (свертки) - это функция, которая принимает в себя два значения - аккумулятор и
+                    текущее значение и возвращает новое значение аккумулятора.
+
+                    Заметим что map filter и countedFind возвращают редюсер - умный редюсер, который понимает когда
+                    нужно изменять аккумулятор
+
+                    Но можно выделить еще один редюсер, ктоторый тупой и знает только КАК мутировать аккумулятор
+
+                    Давайте выделим его в отдельный аргумент - применить FP DI
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+            <pre><code class="javascript" data-trim data-noescape>
+                    map(+1) ::
+                    typeReducer => (acc, cur) => typeReducer(acc, cur + 1)
+                                   '-------------------------------------'
+                                                 logic reducer
+                    filter(>5) ::
+                    typeReducer => (acc, cur) => (cur > 5) ? typeReducer(acc, cur) : acc
+                                   '---------------------------------------------------'
+                                                      logic reducer
+
+                    filter(>5)(arrayReducer) :: filteringArrayReducer - logic reducer
+                    (acc, cur) => (cur > 5) ? arrayReduce(acc, cur) : acc
+
+
+                    map(+1)(filteringArrayReducer) :: map(+1)(filter(>5)(arrayReducer))
+                    (acc, cur) => filteringArrayReducer(acc, cur + 1)
+
+                    incrementFilteringArrayReducer ::
+                    compose(map(+1), filter(>5))(arrayReducer)
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Сократим запись для понимания
+                    Оба трансформатора возвращают каррированную функцию 2х аргументов
+                    Первый аргумент - редюсер типа - инкапсулирует в себе способ мутации новой коллекции
+                    Второй - логический редюсер - инкапсулирует в себе логику применения функции трансформации,
+                    предиката, счетчика...
+
+                    Давайте передадим в фильтрующий трансформатор типовой редюсер - вернется логический фильтрующий
+                    редюсер
+                    Постойте но инкрементирующий трансформатор принимает в себя редюсер хоть и типовой, но по сигнатуре
+                    подой дет любой редюсер
+
+                    Передадим в него фильтрующий редюсер, ктоторый мы получили ранее.
+
+                    Видно закономерность - каждый трансформатор принимает в себя результирующий редюсер вложенного
+                    трансформатора
+                    Можно поставить на конвейер через compose.
+
+                    Получается конпозиция трансформаторов суть более сложный трансформатор, который поочередно вызывает
+                    внутри себя композирующие трансформации!
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+            <pre><code class="javascript" data-trim data-noescape>
+                const arrayReducer = (arrayAcc, cur) =>
+                    arrayAcc.push(cur) && arrayAcc;
+                [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    .reduce(
+                        filter(x => x > 5)(
+                            map(x => x + 1)(
+                                countedFilter(2, x => x % 2 === 0)
+                                    (arrayReducer))),
+                    []
+                ); // [10]
+
+
+                [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    .reduce(compose(
+                        filter(x => x > 5),
+                        map(x => x + 1),
+                        countedFilter(2, x => x % 2 === 0)
+                    )(arrayReducer),
+                    []
+                ); // [10]
+                )
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Применим новые знания в старом стиле и через compose.
+                    Видно, что .reduce применяется единожды - значит нет многократных итераций и выделений памяти для
+                    временных объектов.
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+            <pre><code class="javascript" data-trim data-noescape>
+                const arrayReducer = (arrayAcc, cur) =>
+                    arrayAcc.push(cur) && arrayAcc;
+
+                const transduce = (xfn, accReducer, acc, data) =>
+                    data.reduce(xfn(accReducer), acc);
+
+                transduce(
+                    compose(
+                        filter(x => x > 5),
+                        map(x => x + 1),
+                        countedFilter(2, x => x % 2 === 0)
+                        ),
+                    arrayReducer,
+                    [],
+                    [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                )
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Теперь наружу торчит интерфейс взаимодействия с новой коллекцией.
+                    Давайте выделим новую функцию transduce, ктоторая агностически относится к типу новой коллекции
+                </aside>
+            </section>
+            <section data-background="#e6bb8e">
+                <h2 style="color: #512157;">Ramda</h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                    var numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    var transducer = R.compose(
+                        R.filter(R.lt(5)),
+                        R.map(R.add(1)),
+                        R.filter(x => x % 2 === 0)
+                    );
+                    R.tail(
+                        R.transduce(transducer, R.flip(R.append), [], numbers) // [8, 10]
+                    ); // [10]
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    В Ramda уже реализован трансдюсер и некоторые функции хелперы
+                </aside>
+            </section>
+
+            <section data-background="#e6bb8e">
+                <h2 style="color: #512157;">Transducers Protocol</h2>
+                <h3 style="color: #512157;">Demo time</h3>
+
+                <aside class="notes" data-markdown>
+                    xform - следующий трансорматор
+                    fn - функция трансформации в данном случае или любые другие параметризаторы
+                    Трансформаторы вызывают друг друга себя по цепочке, которая создатся на этапе инициализации
+                    трансдюсера, и вновь по цепочке на этапе окончания перебора и вновь по цепочке на каждом шаге
+                    итерации
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: IDENTITY">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/sahara_eye.jpg" data-background-transition="zoom">
+                <h2 style="color: #a68370;"><span style="background: #4f3954;">Identity</span></h2>
+            </section>
+
+            <section data-background="#4f3954">
+                <h2 style="color: #a68370;">Identity</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                class Identity {
+                    constructor(value) {
+                        this._value = value;
+                    }
+                    static of(val) {
+                        // Identity.of(a) fp-way for new Identity(a)
+                        return new Identity(val);
+                    }
+                    map(fn) {
+                        // Применяет функцию на значение, возвращает тот же тип Identity
+                        return Identity.of(this.chain(fn));
+                    }
+                    chain(fn) {
+                        // Применяет функцию которая возвращает Identity на значение
+                        return fn(this._value);
+                    }
+                    ap(someOtherMonad) {
+                        // Принимает другую монаду со значением-функцией
+                        return someOtherMonad.map(this._value);
+                    }
+                }
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Давайте инкапсулируем значение в контекст и предоставим интерфейс для взаимодействия с ним.
+                    Получается теперь мы можем проксировать взаимодействие с данными
+                </aside>
+            </section>
+
+            <section data-background="#4f3954">
+                <h2 style="color: #a68370;">Контекст и данные</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                const chain = R.invoker(1, "chain");
+                const map = R.invoker(1, "map");
+                const m2 = Identity.of(2);
+                const mInc = Identity.of(x => x + 1);
+                const mDecremented = R.pipe(R.dec, Identity.of);
+
+                mInc                        // Identity(+1)
+                    .ap(m2)                 // Identity(3)
+                    .chain(mDecremented);   // Identity(2)
+
+                m2
+                  .chain(mDecremented) // Identity(1)
+                  .chain(mDecremented) // Identity(0)
+                  .chain(mDecremented) // Identity(-1)
+                  .map(x => x*100);    // Identity(-100)
+
+                R.pipe(
+                  chain(mDecremented), // Identity(1)
+                  chain(mDecremented), // Identity(0)
+                  chain(mDecremented), // Identity(-1)
+                  map(R.multiply(100)  // Identity(-100)
+                )
+            </code></pre>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="FANTASY LAND">-->
+        <section data-background-transition="zoom">
+
+            <section data-background="./img/neverending.jpg" data-background-transition="zoom">
+                <h2 style="color: #35230d;"><span style="background: #c9acb1;">Fantasy Land</span></h2>
+            </section>
+
+            <section data-background="#c9acb1">
+                <h2 style="color: #35230d;">Fantasy Land</h2>
+                <img src="./img/fl.png"/>
+
+                <aside class="notes" data-markdown>
+                    1. Определение алгебраических структур и их иерархии
+
+                    Давайте посмотрим на иерархию монады
+                    Она реализует интерфейсы Functor(map), Apply(of), Applicative(ap), Chain(chain)
+                </aside>
+            </section>
+
+            <section data-background="#c9acb1">
+                <h2 style="color: #35230d;">Fantasy Land</h2>
+
+                <pre style="font-size: .36em;"><code class="csharp" data-trim data-noescape>
+                    var mapping = {
+                        ...
+                        map: 'fantasy-land/map', // Functor
+                        of: 'fantasy-land/of', // Applicative
+                        ap: 'fantasy-land/ap', // Apply
+                        chain: 'fantasy-land/chain', // Chain
+                        concat: 'fantasy-land/concat', // Semigroup
+                        empty: 'fantasy-land/empty', // Monoid
+                        ...
+                    };
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    2. Формализует название методов структур в неймспейсе спецификации
+                </aside>
+            </section>
+
+            <section data-background="#c9acb1">
+                <h2 style="color: #35230d;">Fantasy Land: Type signature notation</h2>
+
+                <pre style="font-size: .36em;"><code class="csharp" data-trim data-noescape>
+                traverse :: Applicative f, Traversable t => t a ~> (TypeRep f, a -> f b) -> f (t b)
+                '------'    '--------------------------'    '-'    '-------------------'    '-----'
+                 '           '                               '      '                        '
+                 '           '- type constraints             '      '- argument types        '- return type
+                 '                                           '
+                 '- method name                              '- method target type
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    3. Описание методов с их математическими свойствами, присущих той или иной структуре
+
+                    `travers` - это метод (`~>`) на объекте структуры `t` вокруг `a`.
+                    + Принимает:
+                    1. инстанс (`TypeRef`) `f`
+                    2. функция:
+                    + принимает значение такого же типа, что и `a`
+                    + возвращает объект того же типа, что и `f` вокруг `b`
+                    + Возвращает объект типа `f` вокруг `t` вокруг `b`
+                    ----
+                    `f` - имплементирует `Applicative`
+
+                    `t` - имплементирует `Traversable`
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: MAYBE">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/bamboo.jpeg" data-background-transition="zoom">
+                <h2 style="color: #002238;"><span style="background: #4e888a;">Maybe</span></h2>
+            </section>
+
+            <section data-background="#4e888a">
+            <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                function Maybe(value) { // Maybe a = Just a | Nothing
+                    return value == null ? new Nothing() : new Just(value);
+                }
+
+                class Nothing {
+                    ap() { return this; }
+                    chain() { return this; }
+                    map() { return this; }
+                    getOrElse (x) { return x; }
+                }
+
+                class Just {
+                    constructor(value) { this.__value = value;  }
+                    ap(other) { return (other instanceof Just) ?
+                        new Just(this.__value (other.__value)) : other;
+                    }
+                    chain(fn) { return fn(this.__value); }
+                    map(fn) { return new Just(this.chain(fn)); }
+                    getOrElse () { return this.__value; }
+                }
+
+                Maybe(2) // Just(2) || null
+                    .map(R.inc)   // Just(3) || Nothing
+                    .getOrElse(8) // 3 || 8
+
+                Maybe(R.inc) // Just(+1)
+                    .ap(Maybe(2)) // Just(3) || Nothing
+                    .getOrElse(8) // 3 || 8
+
+                Maybe(333).map(R.identity); // 3 * I = 3  - identity => Maybe(333)
+                Maybe(333).map(R.pipe(R.inc, R.inc)); // composition => Maybe(335)
+                Maybe(333).map(R.inc).map(R.inc); // 3 * (+1 + +1) = (3 * +1) * +1
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    `Maybe` реализует интерфес `Monad`.
+                    Разделение происходит в момент создания монады и разграничивается на уровне классов с интерфейсов
+                    монады
+                    Проверим спецификацию `map` удовлетворяет свойствам функтора как минимум)
+                </aside>
+            </section>
+
+            <section data-background="#4e888a">
+            <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                const maybePath = R.curry((path, obj) => R.pipe(R.path(path), S.toMaybe)(obj));
+
+                R.pipe(
+                  maybePath(["a"]),
+                  R.tap(console.log),
+                  log, // Just({s:{d:"qwe"}}) || Nothing
+                  S.chain(maybePath(["s", "d"])),
+                  log, // Just("qwe") || Nothing
+                  S.map(R.toUpper),
+                  log, // Just("QWE") || Nothing
+                  S.fromMaybe("default"),
+                  R.tap(console.log) // "QWE" || "default"
+                )({ a: { s: { d: "qwe" } } });
+
+                R.pipe(
+                  S.toMaybe,
+                  log, // Just(2) || Nothing
+                  S.chain(R.pipe(
+                    R.inc,
+                    R.always(null), // [un]comment
+                    S.toMaybe
+                  )),
+                  log, // Just(3) || Nothing
+                  S.fromMaybe(777),
+                  log, // 3 || 777
+                )(2);
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Конечно уже существуют и структуры и библиотеки реализующие спецификацию FL.
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: EITHER">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/fork.jpg" data-background-transition="zoom">
+                <h2 style="color: #5b7256;"><span style="background: #d0ca93;">Either</span></h2>
+            </section>
+
+            <section data-background="#d0ca93">
+                <h2 style="color: #5b7256;">Left / Right</h2>
+
+                <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                const safeDivide = R.curry((a, b) => b === 0 ?
+                    Either.Left(new Error("Divided by zero!")) :
+                    Either.Right(a / b));
+
+                const throwedDivide = ([a, b]) => {
+                  if (b === 0) { throw new Error("Divided by zero!"); }
+                  else { return a / b;}
+                };
+
+                R.pipe(
+                  log, // Left (new Error ("Divided by zero!")) || Right (1)
+                  S.chain(safeDivide(R.__, 2)),
+                  log, // Left (new Error ("Divided by zero!")) || Right (0.5)
+                  S.fromEither(222),
+                  log // 222 || 0.5
+                )(safeDivide(2, 0));
+
+                R.pipe(
+                  S.encaseEither(R.prop("message"))(throwedDivide),
+                  log, // Left ("Divided by zero!") || Right (1)
+                  S.chain(safeDivide(R.__, 2)),
+                  log, // Left ("Divided by zero!") || Right (0.5)
+                  S.fromEither(222),
+                  log // 222 || 0.5
+                )([1, 0])
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Конечно уже существуют и структуры и библиотеки реализующие спецификацию FL.
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: WRITER">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/pushkin.jpg" data-background-position="center 33%"
+                     data-background-transition="zoom">
+                <h2 style="color: #283329;"><span style="background: #803427;">Writer</span></h2>
+            </section>
+
+            <section data-background="#803427">
+                <h2 style="color: #283329;">Storage</h2>
+
+                <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                class Store { // Monoid(empty) -> Semigroup(concat)
+                    constructor(value) {
+                        this._store = value === undefined ? [] : [].concat(value);
+                    }
+                    concat(anotherStore) {
+                        if (!(anotherStore instanceof Store)) {
+                          throw new Error("concat :: Store");
+                        }
+                        return Store.of(this._store.concat(anotherStore._store));
+                    }
+                    static of(value) { return new Store(value); }
+                    static empty() { return Store.of(); }
+                    getStore() { return this._store; }
+                }
+            </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Сначала сконфигурируем хранилище - простое множество с пустым элементом и определенной на нем
+                    операцией
+                    конкатенации
+                </aside>
+            </section>
+
+            <section data-background="#803427">
+                <h2 style="color: #283329;">Writer</h2>
+
+                <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                    const getWriter = R.curry((Storage) =>
+                        class Writer {
+                            constructor({ value, store }) {
+                                this._store = store;
+                                this._value = value;
+                            }
+                            run() {
+                                return { value: this._value, store: this._store };
+                            }
+                            chain(fn) {
+                                const { value, store } = this.run();
+                                const { value: newValue, store: newStore } = fn(value).run();
+
+                                return new Writer({ value: newValue, store: store.concat(newStore) });
+                            }
+                            ap(other) { return other.map(this._value); }
+                            map(fn) {
+                                const { value, store } = this.run();
+                                return new Writer({ value: fn(value), store });
+                            }
+                            static storage = Storage;
+                            static of(value) {
+                                return new Writer({ value, store: Storage.empty()});
+                            }
+                        }
+                    );
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Фокус такой - оставляя тот же интерфейс монад снаружи. Внутри с помощью проксирующих методов
+                    иммутабельно оперируем с картежем значение-лог.
+                    Получаем текущий картеж, на значение применяем функцию, а лог конкатенируем.
+                    Возвращаем новый экземпляр монады.
+                </aside>
+            </section>
+
+            <section data-background="#803427">
+                <h2 style="color: #283329;">Writer</h2>
+
+                <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                    const storeWriter = getWriter(Store);
+                    const wAdd = R.curry((x, y) => new storeWriter({
+                        value: x + y,
+                        store: storeWriter.storage.of(`${x} + ${y} = ${x + y}`)
+                    }));
+
+                    const wMul = R.curry((x, y) => new storeWriter({
+                        value: x * y,
+                        store: storeWriter.storage.of(`${x} * ${y} = ${x * y}`)
+                    }));
+
+                    const wInc = (x) => new storeWriter({
+                        value: x + 1,
+                        store: storeWriter.storage.of(`${x} was incremented`)
+                    });
+
+                    console.log( wAdd(1,2) // Writer({value: 3  , store: ["1 + 2 = 3"]})
+                        .chain(wMul(100))  // Writer({value: 300, store: ["1 + 2 = 3", "100 * 3 = 300"]})
+                        .chain(wInc) // Writer({value: 301, store:
+                                     // ["1 + 2 = 3", "100 * 3 = 300", "300 was incremented"]})
+                        .run() // {value: 301, store: ["1 + 2 = 3", "100 * 3 = 300", "300 was incremented"]}
+                    );
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Таким образом монада Writer позволяет вести лог, при этом оставляя чистый деклоративный интерфейс
+                    для манипуляции данными
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: FUTURE">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/delorian.jpg"
+                     data-background-transition="zoom">
+                <h2 style="color: #9a2f0e;"><span style="background: #96a0bb;">Future</span></h2>
+            </section>
+
+            <section data-background="#96a0bb">
+                <h2 style="color: #9a2f0e;">Future</h2>
+
+                <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                    class Future {
+                        constructor(fork) { this._fork = fork; }
+
+                        static of(val) { return new Future((res, rej) => res(val)); }
+
+                        chain(fn) {
+                            return new Future((res, rej) =>
+                                this._fork(
+                                    val => fn(val)._fork(res, rej),
+                                    err => rej(err)  // transit error further
+                                )
+                            );
+                        }
+
+                        ap(other) {
+                            return new Future((res, rej) => {
+                                other._fork(val => {
+                                    this._fork(fn => {
+                                        res(fn(val))
+                                    })
+                                })
+                            })
+                        }
+
+                        map(fn) { return this.chain(val => Future.of(fn(val))); }
+
+                        fork(res, rej) { this._fork(res, rej); }
+                    }
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Решает схожие задачи, чтои Promise, Defferreds, Tasks, то есть выполняет асинхронные операции
+                    Но делает это лениво и предоставляя монадный интерфейс.
+                </aside>
+            </section>
+
+
+            <section data-background="#96a0bb">
+                <h2 style="color: #9a2f0e;">Future</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    const fRange = Future.of(R.range);
+                    const fInc = Future.of(val => val + 1);
+                    const f2 = Future.of(2);
+                    const logger = [
+                        data => console.info("data: ", data),
+                        err => console.error("err: ", err)
+                    ];
+                    const f3 = fInc.ap(f2);
+                    const f10 = Future.of(10);
+
+                    f10.fork(...logger);
+                    fRange.ap(f2).ap(f10).fork(...logger);
+                    f10.fork(...logger);
+                    f10.map(R.add(3)).fork(...logger);
+                    f10.chain(val => Future.of(val + 100)).fork(...logger);
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    предоставляет разный интерфейс для map и chain в отличие от Promise
+                    явная обработка ошибок - позволяет
+                    ленивость
+
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: IO">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/IO.jpg" data-background-transition="zoom">
+                <h2 style="color: #301f0d;">
+                    <span style="background: #b07333;">IO</span></h2>
+                <aside class="notes" data-markdown>
+                    Асимптотическая идея ФП - чистые программы.
+                    Но наш мир таков, что наблюдатель, наблюдаемое и факт наблюдения не разделимы.
+                    Существует ли вычисления без эффектов? Если да, то прямо сейчас бесчетное множество ФП программ
+                    выполняются, но мы их не видим, так выполняются ли они?)
+
+                    Монада IO - способ проникнуть в идеальный мир ФП, привнеся туда сайдеффекты.
+                    Программы на чистом ФП языке Haskell выполняются внутри монады IO,
+                    которая передает в точку входа параметры запуска.
+                </aside>
+            </section>
+            <section data-background="#b07333" data-background-transition="zoom">
+                <h2 style="color: #301f0d;">IO</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    class IO {
+                        constructor(effect) {
+                            this._effect = effect;
+                        }
+                        static of(x) {
+                            return new IO(_ => x);
+                        }
+                        static from(fn) {
+                            return new IO(fn);
+                        }
+                        ap(otherIO) {
+                            return this.chain(fn => otherIO.map(fn));
+                        }
+                        map(fn) {
+                            return this.chain(a => IO.of(fn(a)));
+                        }
+                        chain(fn) {
+                            return new IO(() =>
+                                fn(this._effect()).run()
+                            );
+                        }
+                        run() {
+                            return this._effect();
+                        }
+                    }
+            </code></pre>
+                <a href="https://codeburst.io/composing-the-uncomposable-23dbcd46940c">IO(DOM)</a>
+                &&
+                <a href="https://habr.com/company/ruvds/blog/422589/">IO !== Reader</a>
+                <aside class="notes" data-markdown>
+                </aside>
+
+            </section>
+            <section data-background="#b07333" data-background-transition="zoom">
+                <h2 style="color: #301f0d;">IO</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    const read = id =>
+                            _ => document.querySelector(`\#${id}`).innerHTML;
+                    const write = id =>
+                            val => document.querySelector(`\#${id}`).innerHTML = val;
+                    const toUpperCase = x => x.toUpperCase();
+
+                    const changeToStartCase = IO.from(read('student-name'))
+                        .map(toUpperCase)
+                        .map(write('student-name'));
+
+                    changeToStartCase.run()
+                </code></pre>
+                <aside class="notes" data-markdown>
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: READER">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/environment.jpg" data-background-transition="zoom">
+                <h2 style="color: #4c3a34;">
+                    <span style="background: #577200;">Reader</span>
+                </h2>
+            </section>
+            <section data-background="#577200" data-background-transition="zoom">
+                <h2 style="color: #4c3a34;">Reader</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                class Reader {
+                    constructor(effect) {
+                        this._effect = effect;
+                    }
+                    static ask = new Reader(env => env);
+                    static of(x) {
+                        return new Reader(_ => x);
+                    }
+                    ap(otherReader) {
+                        return this.chain(env => otherReader.map(env));
+                    }
+                    map(fn) {
+                        return this.chain(env => Reader.of(fn(env)));
+                    }
+                    chain(fn) {
+                        return new Reader(env => fn(this._effect(env)).run(env));
+                    }
+                    run(env) {
+                        return this._effect(env);
+                    }
+                }
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Можно сказать что это монада IO, отлько с шарингом параметров по всей цепочке
+                </aside>
+            </section>
+            <section data-background="#577200" data-background-transition="zoom">
+                <h2 style="color: #4c3a34;">Reader</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                const sum = a => b => a + b;
+
+                const sumWithEnv = aReader => Reader.ask.map(bEnv => {
+                    return sum(aReader)(bEnv);
+                });
+
+                Reader.of(2)
+                    .chain(sumWithEnv) // 3 2
+                    .chain(sumWithEnv) // 3 5
+                    .run(3);           // 8
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    В консоли видно, что параметр 3 шарится между всеми инстансами Reader.
+                    Параметр - своего рода глобальная переменная для манадической цепочки Reader.
+                </aside>
+            </section>
+            <section data-background="#577200" data-background-transition="zoom">
+                <h2 style="color: #4c3a34;">Reader</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                const inc = x => x + 1;
+
+                const db = { insert(x) {
+                    return { id: 1, value: x };
+                }};
+
+                const save = x => Reader.ask.map(db => db.insert(x));
+
+                const create = x =>
+                    Reader.of(x)
+                    .map(inc)
+                    .chain(save)
+                    .map(JSON.stringify);
+
+                let asd = create(2).run(db); // {"id":1,"value":3}
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Save - создает монаду, и параметр db берет из параметризатора run.
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="M: STATE">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/sunduk.jpg" data-background-transition="zoom">
+                <h2 style="color: #50272f;">
+                    <span style="background: #81553f;">State</span>
+                </h2>
+            </section>
+            <section data-background="#81553f" data-background-transition="zoom">
+                    <pre><code class="javascript" data-trim data-noescape style="font-size: .75em;line-height: normal;">
+                        class State {
+                            constructor(effect) {
+                                this._effect = effect;
+                            }
+                            static of(res) {
+                                return new State(state => ({ res, state }));
+                            }
+                            ap(otherState) {
+                                return this.chain(xfn => otherState.map(xfn));
+                            }
+                            map(xfn) {
+                                return this.chain(res => State.of(xfn(res)));
+                            }
+                            chain(fn) {
+                                return new State(res => {
+                                    const {
+                                        res: lastRes,
+                                        state: lastState
+                                    } = this._effect(res);
+                                    return fn(lastRes).run(lastState);
+                                });
+                            }
+
+                            run(state)  { return this._effect(state); }
+                            eval(state) { return this._effect(state).res; }
+                            exec(state) { return this._effect(state).state; }
+
+                            static get = new State(state => ({ res: state, state }));
+
+                            static modify(xfn) {
+                                return new State(state => ({ res: null, state: xfn(state) }));
+                            }
+                            static put(state) {
+                                return State.modify(_ => state);
+                            }
+                        }
+                    </code></pre>
+                <aside class="notes" data-markdown>
+                    Задумка такая - вычисления возвращают картеж результат-состояние
+                </aside>
+            </section>
+
+            <section data-background="#81553f" data-background-transition="zoom">
+                <h2 style="color: #50272f;">State</h2>
+
+                <pre><code class="javascript" data-trim data-noescape>
+                    const sub = (x, y) => x - y;
+                    const K = x => _ => x;
+                    const res2store = x => State.put(x).map(K(x));
+                    const store2resWith = op => res =>
+                        new State(state => ({ res: op(res, state), state }))
+
+                    State.of(x => x + 7)   // { res: x=>x+7, state: 2 }
+                        .ap(State.of(1))   // { res: 8,      state: 2 }
+                        .chain(res2store)  // { res: 8,      state: 8 }
+                        .map(x => x + 1)   // { res: 9,      state: 8 }
+                        .chain(store2resWith(sub))
+                        .run(2);           // { res: 1,      state:8 }
+                </code></pre>
+                <aside class="notes" data-markdown>
+                    Самым интересным является метод chain внутри которого формируется новое состояние по мативам старого
+                    Это позволяет как положить результат в состояние, так и вытащить результат из состояния для
+                    дальнейших манипуляций
+                    Кроме того видно что state работает как обычная монада.
+                </aside>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="WAY">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/yak.jpg" data-background-transition="zoom"
+                     data-background-position="center bottom">
+                <h2 style="color: #b50622;">
+                    <span style="background: #141010;">
+                        Як
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Чтобы начать разбираться в ФП первым делом нужно запрячь яка однонаправленности и интереса.
+                    </aside>
+                </h2>
+            </section>
+            <section data-background="./img/pust.jpg" data-background-transition="zoom">
+                <h2 style="color: #7b7a2a;">
+                    <span style="background: #813b27;">
+                        Пустыня
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Преодолеть пустыню каррирования и функций высшего порядка.
+                    </aside>
+                </h2>
+            </section>
+            <section data-background="./img/lake.jpg" data-background-transition="zoom">
+                <h2 style="color: #7fb3c1;">
+                    <span style="background: #8f795d;">
+                        Горное озеро
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Насладиться горным озером функциональной оптики.
+                    </aside>
+                </h2>
+            </section>
+            <section data-background="./img/boloto.jpg" data-background-transition="zoom">
+                <h2 style="color: #406b13;">
+                    <span style="background: #d7dd3d;">
+                        Болото
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Преодолеть монадное болото.
+                    </aside>
+                </h2>
+            </section>
+            <section data-background="./img/paradise.jpg" data-background-transition="zoom">
+                <h2 style="color: #e8d8c2;">
+                    <span style="background: #4ab2c8;">
+                        Пляж
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Прийти к пляжу понимания FP.
+                    </aside>
+                </h2>
+            </section>
+            <section data-background="./img/shorm.jpg" data-background-transition="zoom">
+                <h2 style="color: #a6b0b9;">
+                    <span style="background: #162f47;">
+                        Буря
+                    </span>
+                    <aside class="notes" data-markdown>
+                        Смотрет в даль и видеть непознанное - теория категорий, комбинаторная логика, монадные
+                        трансформеры...
+                        Но главное, что ты с яком!
+                    </aside>
+                </h2>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="SOURCES">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/sources.jpg" data-background-transition="zoom">
+                <h2 style="text-align: right;color: #a07356;">
+                    <span style="background: #423a37;">
+                        Свитки&nbsp;<br/>&nbsp;древних
+                    </span>
+                </h2>
+            </section>
+            <section data-background-color="#423a37">
+                <style>
+                    .materials, .materials a {
+                        color: #a07356;
+                        text-decoration: underline;
+                    }
+
+                    .materials a:visited {
+                        color: #6d4e3b;
+                    }
+
+                    .materials a:hover, .materials a:focus {
+                        color: #efaa7c;
+                    }
+                </style>
+                <div class="grid materials" style="font-size: .75em;">
+                    <div>
+                        <ul>
+                            <li><a href="https://medium.com/devschacht/fp/home" target="_blank">Дев шахта</a></li>
+                            <li>
+                                <a href="https://medium.com/@gcanti/introduction-to-optics-lenses-and-prisms-3230e73bfcfe"
+                                   target="_blank">Lenses & Prisms</a></li>
+                            <li><a href="https://habr.com/post/348868/" target="_blank">Мышление Ramda</a></li>
+                            <li><a href="https://www.youtube.com/channel/UCbF-4yQQAWw-UnuCd2Azfzg/playlists"
+                                   target="_blank">Ramda tutorial Youtube</a></li>
+                            <li><a href="https://habr.com/post/183150/" target="_blank">Функторы, аппликативные функторы
+                                и монады в картинках</a></li>
+                            <li><a href="https://habr.com/post/184722/" target="_blank">Тройка полезных монад</a></li>
+                            <li><a href="https://mmhaskell.com/" target="_blank">Про Haskell</a></li>
+                            <li><a href="https://www.youtube.com/user/TheEvilSoft/playlists" target="_blank">FP and
+                                ADT</a></li>
+                            <li><a href="https://egghead.io/lessons/javascript-construct-a-stateful-monad"
+                                   target="_blank">State monad Egghead</a></li>
+                            <li><a href="https://egghead.io/courses/safer-javascript-with-the-maybe-type"
+                                   target="_blank">Maybe monad Egghead</a></li>
+                            <li>
+                                <a href="https://egghead.io/courses/professor-frisby-introduces-composable-functional-javascript"
+                                   target="_blank">ФП с профессором Ёжиком</a></li>
+                            <li><a href="http://tonsky.me/" target="_blank">Бложик</a></li>
+                            <li><a href="https://medium.com/@viktorlove/oh-god-why-monads-a6968a63832e" target="_blank">Гневный
+                                забавный пост про монады</a></li>
+                            <li><a href="https://www.youtube.com/watch?v=6nyGVgGEKdA&t=6s" target="_blank">Optics beyond
+                                lenses</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <ul>
+                            <li><a href="https://ramdajs.com/" target="_blank">Ramda</a></li>
+                            <li><a href="https://github.com/sanctuary-js/sanctuary" target="_blank">Sanctuary</a></li>
+                            <li><a href="https://folktale.origamitower.com/" target="_blank">Folktale</a></li>
+                            <li><a href="https://monet.github.io/monet.js" target="_blank">Monet</a></li>
+                            <li><a href="https://github.com/evilsoft/crocks" target="_blank">Crocks</a></li>
+                            <li><a href="https://github.com/calmm-js/partial.lenses" target="_blank">partial.lenses</a>
+                            </li>
+                            <li><a href="https://github.com/gcanti/monocle-ts" target="_blank">Scala -> Ts Monocle</a>
+                            </li>
+                            <li><a href="https://github.com/polytypic/fastener" target="_blank">zipper for json</a></li>
+                            <li><a href="https://github.com/cognitect-labs/transducers-js" target="_blank">transducers-js</a>
+                                <a href="https://github.com/jlongster/transducers.js" target="_blank">transducers.js</a>
+                            </li>
+                            <li><a href="https://arrow-kt.io/" target="_blank">FP Kotlin</a></li>
+                            <li><a href="http://anton-k.github.io/ru-haskell-book/book/home.html" target="_blank">Учебничек
+                                по Haskell</a></li>
+                            <li>
+                                <a href="https://www.youtube.com/watch?v=I5UUkmy-I9I&list=PLwwk4BHih4fj2fxUuHEfvwNN84LALr5R3"
+                                   target="_blank">Денис Николаевич Москвин</a></li>
+                            <li>
+                                <a href="https://www.youtube.com/watch?v=7BPQ-gpXKt4&list=PLUvykjd9zP05iv2bsoMBC0cw1ox4qfU2J"
+                                   target="_blank">Денис Николаевич Москвин</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section data-background="./img/compose.jpg" data-background-transition="convex">
+                <h2><span style="background: #222222;">TC-39: Proposal Pipeline Operator</span></h2>
+
+                <div class="grid grid--3-4">
+                    <img style="float: left;" src="./img/qr/pipeline.png" alt="">
+                    <div>
+                        <pre><code class="javascript" data-trim data-noescape>
+                            let result = exclaim(capitalize(doubleSay("hello")));
+                            result // "Hello, hello!"
+
+                            let result = "hello"
+                              |> doubleSay
+                              |> capitalize
+                              |> exclaim;
+
+                            result // "Hello, hello!"
+                        </code></pre>
+                    </div>
+                </div>
+                <a target="_blank" href="https://github.com/tc39/proposal-pipeline-operator"><span
+                        style="background: #222222;">https://github.com/tc39/proposal-pipeline-operator</span></a>
+            </section>
+
+            <section data-background="./img/curry.jpg" data-background-transition="convex">
+                <h2 style="color:#b0b2af;"><span style="background: #cd4f04;">TC-39: Proposal Partial Application</span>
+                </h2>
+
+                <div class="grid grid--3-4">
+                    <img src="./img/qr/placeholder.png" alt="">
+                    <div>
+                        <pre style="font-size: .36em;"><code class="javascript" data-trim data-noescape>
+                            const addOne = add(1, ?); // apply from the left
+                            addOne(2); // 3
+
+                            const addTen = add(?, 10); // apply from the right
+                            addTen(2); // 12
+
+                            const newScore = player.score
+                              |> _ => add(7, _)
+                              |> _ => clamp(0, 100, _);
+
+                            let newScore = player.score
+                              |> add(7, ?)
+                              |> clamp(0, 100, ?);
+
+                            const tmplStr = `'${?}' not found.`;
+                            tmplStr("foo"); // "'foo' not found."
+                        </code></pre>
+                    </div>
+                </div>
+                <a target="_blank" href="https://github.com/tc39/proposal-partial-application">
+                    <span style="background: #cd4f04;">https://github.com/tc39/proposal-partial-application</span>
+                </a>
+            </section>
+
+            <section data-background="./img/arhar.jpg" data-background-transition="convex">
+                <h2 style="color: #61371a;"><span style="background: #7a9e67;">TC-39: Proposal Pattern Matching</span>
+                </h2>
+                <div class="grid grid--3-4">
+                    <img src="./img/qr/pattern-matching.png" alt="">
+                    <div>
+                        <pre><code class="javascript" data-trim data-noescape>
+                            const res = await fetch(jsonService)
+                            case (res) {
+                              when {status: 200, headers: {'Cookie': s}} -> {
+                                console.log(`cookie is ${s}`)
+                              }
+                              when {status: 404} -> {
+                                console.log('JSON not found')
+                              }
+                              when {status} if (status >= 400) -> {
+                                throw new RequestError(res)
+                              }
+                            }
+                        </code></pre>
+                    </div>
+                </div>
+                <a target="_blank" href="https://github.com/tc39/proposal-pattern-matching"><span
+                        style="background: #7a9e67;">https://github.com/tc39/proposal-pattern-matching</span></a>
+            </section>
+
+            <section data-background="./img/bamboo.jpeg" data-background-transition="convex">
+                <h2 style="color: #002238;"><span style="background: #4e888a;">TC-39: Proposal Optional Chaining</span>
+                </h2>
+                <div class="grid grid--3-4">
+                    <img src="./img/qr/elvis.png" alt="">
+                    <div>
+                        <pre><code class="javascript" data-trim data-noescape>
+                            a?.b[3].c?.(x).d
+
+                            (a == null)
+                                ? undefined
+                                : (a.b[3].c == null)
+                                    ? undefined
+                                    : a.b[3].c(x).d
+                              // (as always, except that `a` and `a.b[3].c`
+                              // are evaluated only once)
+                        </code></pre>
+                    </div>
+                </div>
+                <a target="_blank" href="https://github.com/tc39/proposal-optional-chaining"><span
+                        style="background: #4e888a;">https://github.com/tc39/proposal-optional-chaining</span></a>
+            </section>
+
+            <section data-background="./img/bamboo.jpeg" data-background-transition="convex">
+                <h2 style="color: #002238;"><span style="background: #4e888a;">TC-39: Proposal Nullish Coalescing</span>
+                </h2>
+                <div class="grid grid--3-4">
+                    <img src="./img/qr/nullish.png" alt="">
+                    <div>
+                        <pre><code class="javascript" data-trim data-noescape>
+                            const obj = {
+                                [[und]]      : undefined, // + // falsy
+                                noll         : null,      // + // falsy
+                                nothing      : '',        // - // falsy
+                                zero         : 0,         // - // falsy
+                                F            : false      // - //
+                            };
+
+                            undef   = obj?.und     ?? 'default'; // 'default'
+                            noll    = obj?.noll    ?? 'default'; // 'default'
+                            nothing = obj?.nothing ?? 'default'; // ''
+                            zero    = obj?.zero    ?? 'default'; // 0
+                            F       = obj?.F       ?? 'default'; // false
+                        </code></pre>
+                    </div>
+                </div>
+                <a target="_blank" href="https://github.com/tc39/proposal-nullish-coalescing"><span
+                        style="background: #4e888a;">https://github.com/tc39/proposal-nullish-coalescing</span></a>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="WHAT NEXT">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/alch.jpg" data-background-transition="zoom">
+                <h2 style="color: #24261b;">
+                    <span style="background: #73624f;">More</span>
+                </h2>
+            </section>
+            <section data-background-color="#73624f" data-background-transition="zoom">
+                <h2 style="color: #24261b;">More</h2>
+                <ul style="color: #24261b;">
+                    <li>AOP in JS</li>
+                    <li>RXJS</li>
+                    <li>TS</li>
+                    <li>Библиотека для NPM</li>
+                    <li>CLI утилита для Node.js</li>
+                    <li>DI in JS</li>
+                    <li>PostCSS plugin</li>
+                </ul>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+        <!--<editor-fold desc="OUTRO">-->
+        <section data-background-transition="zoom">
+            <section data-background="./img/department.jpg" data-background-transition="zoom">
+                <h2 style="color: #182828;">
+                    <span style="background: #455d5d;">Спасибо за внимание</span>
+                </h2>
+            </section>
+            <section data-background-color="#455d5d" data-background-transition="zoom">
+                <h2 style="color: #182828;">
+                    <span style="background: #455d5d;">Sleep&nbsp;<br/>&nbsp;Driving&nbsp;<br/>&nbsp;Understanding</span>
+                </h2>
+                <pre><code class="javascript" data-trim data-noescape>
+                    const sleep = () => console.log("Sleep");
+
+                    const understand = what =>
+                        PrependEach.of(what)
+                            .map(negation)
+                            .map(anger)
+                            .map(bargain)
+                            .map(depression)
+                            .map(adoption);
+
+                    understand(fpPresentation).through(sleep) === "I understand!";
+                </code></pre>
+
+                <aside class="notes" data-markdown>
+                    Понимание через сон, а не СОН-ВОЖДЕНИЕ-ПОНИМАНИЕ)))
+                </aside>
+            </section>
+            <section data-background="./img/department.jpg" data-background-transition="zoom">
+                <h2 style="color: #182828;">
+                    <span style="background: #455d5d;">
+                        Вопросы&nbsp;<br/>&nbsp;прения
+                    </span>
+                </h2>
+            </section>
+        </section>
+        <!--</editor-fold>-->
+    </div>
+</div>
+
+<script src="lib/js/head.min.js"></script>
+<script src="js/reveal.js"></script>
+
+<script>
+    // More info https://github.com/hakimel/reveal.js#configuration
+    Reveal.initialize({
+        history    : true,
+        slideNumber: true,
+        // center     : false,
+
+        // More info https://github.com/hakimel/reveal.js#dependencies
+        dependencies: [
+            {src: 'plugin/markdown/marked.js'},
+            {src: 'plugin/markdown/markdown.js'},
+            {src: 'plugin/notes/notes.js', async: true},
+            {
+                src     : 'plugin/highlight/highlight.js',
+                async   : true,
+                callback: function () {
+                    hljs.initHighlightingOnLoad();
+                }
+            }
+        ]
+    });
+</script>
+</body>
+</html>
